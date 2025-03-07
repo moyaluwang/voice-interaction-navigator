@@ -47,6 +47,7 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognition;
 }
 
+// This is the critical part - we're extending the global Window interface
 declare global {
   interface Window {
     SpeechRecognition?: SpeechRecognitionConstructor;

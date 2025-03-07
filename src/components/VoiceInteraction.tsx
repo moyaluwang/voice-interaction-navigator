@@ -62,7 +62,9 @@ const VoiceInteraction: React.FC = () => {
 
   useEffect(() => {
     // Check if browser supports SpeechRecognition
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Using type assertion to handle the potentially undefined properties
+    const SpeechRecognitionAPI = (window.SpeechRecognition || 
+      window.webkitSpeechRecognition) as typeof window.SpeechRecognition;
     
     if (SpeechRecognitionAPI) {
       recognitionRef.current = new SpeechRecognitionAPI();
