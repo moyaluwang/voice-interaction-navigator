@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import { Mic, MicOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import TranscriptionDisplay from './TranscriptionDisplay';
 
@@ -37,7 +35,10 @@ const VoiceInteraction: React.FC = () => {
       
       recognitionRef.current.onend = () => {
         if (voiceState === VoiceState.LISTENING && isMounted.current) {
-          handleStateChange(VoiceState.IDLING);
+          // Restart recognition when it ends while still in listening state
+          if (recognitionRef.current) {
+            recognitionRef.current.start();
+          }
         }
       };
       
@@ -46,6 +47,8 @@ const VoiceInteraction: React.FC = () => {
         .then(() => {
           if (isMounted.current) {
             handleStateChange(VoiceState.IDLING);
+            // Auto-start listening when the component mounts
+            startListening();
           }
         })
         .catch(() => {
@@ -78,11 +81,15 @@ const VoiceInteraction: React.FC = () => {
     setVoiceState(newState);
   };
 
-  const toggleListening = () => {
+  const startListening = () => {
     if (voiceState === VoiceState.UNPERMITTED) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(() => {
-          handleStateChange(VoiceState.IDLING);
+          handleStateChange(VoiceState.LISTENING);
+          setTranscript('');
+          if (recognitionRef.current) {
+            recognitionRef.current.start();
+          }
         })
         .catch(() => {
           toast({
@@ -94,46 +101,43 @@ const VoiceInteraction: React.FC = () => {
       return;
     }
     
-    if (voiceState === VoiceState.IDLING) {
-      handleStateChange(VoiceState.LISTENING);
-      setTranscript('');
-      
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-      }
-    } else if (voiceState === VoiceState.LISTENING) {
-      handleStateChange(VoiceState.IDLING);
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+    handleStateChange(VoiceState.LISTENING);
+    setTranscript('');
+    
+    if (recognitionRef.current) {
+      recognitionRef.current.start();
     }
   };
 
+  const stopListening = () => {
+    handleStateChange(VoiceState.IDLING);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  // Auto-toggle listening when clicking anywhere
+  useEffect(() => {
+    const handleDocumentClick = () => {
+      if (voiceState === VoiceState.IDLING) {
+        startListening();
+      } else if (voiceState === VoiceState.LISTENING) {
+        stopListening();
+      }
+    };
+
+    document.addEventListener('click', handleDocumentClick);
+    
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [voiceState]);
+
   return (
-    <>
-      <TranscriptionDisplay 
-        text={transcript} 
-        isActive={voiceState === VoiceState.LISTENING} 
-      />
-      
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-        <Button 
-          onClick={toggleListening}
-          variant="outline" 
-          size="icon"
-          className={`rounded-full w-14 h-14 bg-black/60 border-gray-700 hover:bg-black/80 hover:border-primary
-            ${voiceState === VoiceState.LISTENING ? 'bg-primary/20 border-primary animate-pulse' : ''}`}
-        >
-          {voiceState === VoiceState.UNPERMITTED ? (
-            <MicOff className="h-6 w-6 text-gray-400" />
-          ) : voiceState === VoiceState.LISTENING ? (
-            <Mic className="h-6 w-6 text-primary animate-pulse" />
-          ) : (
-            <Mic className="h-6 w-6 text-white" />
-          )}
-        </Button>
-      </div>
-    </>
+    <TranscriptionDisplay 
+      text={transcript} 
+      isActive={voiceState === VoiceState.LISTENING} 
+    />
   );
 };
 
